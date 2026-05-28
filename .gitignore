@@ -1,0 +1,10 @@
+.claude
+outputs/visualizations/
+outputs/*.csv
+outputs/*.json
+__pycache__/
+*.pyc
+.env
+*.egg-info/
+dist/
+build/
