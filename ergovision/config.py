@@ -55,9 +55,9 @@ TORSO_THRESHOLDS = {
 }
 
 NECK_THRESHOLDS = {
-    'low': (0, 15),
-    'medium': (15, 40),
-    'high': (40, 180),
+    'low': (0, 10),
+    'medium': (10, 30),
+    'high': (30, 180),
 }
 
 KNEE_THRESHOLDS = {
@@ -78,16 +78,8 @@ INCLINATION_THRESHOLDS = {
     'high': (30, float('inf')),
 }
 
-# Feature weights for overall risk
-FEATURE_WEIGHTS = {
-    'torso_angle': 0.30,
-    'neck_angle': 0.20,
-    'knee_angle': 0.15,
-    'shoulder_asymmetry': 0.15,
-    'body_inclination': 0.20,
-}
-
-# Risk class labels
+# Risk class labels (index 0 -> score 1 = Low Risk, index 1 -> score 2 = Medium Risk,
+# index 2 -> score 3 = High Risk)
 RISK_CLASSES = ['Low Risk', 'Medium Risk', 'High Risk']
 
 # Output directories
@@ -95,3 +87,26 @@ OUTPUT_DIR = Path('outputs')
 VISUALIZATION_DIR = OUTPUT_DIR / 'visualizations'
 CSV_OUTPUT = OUTPUT_DIR / 'ergonomic_assessment.csv'
 JSON_OUTPUT = OUTPUT_DIR / 'ergonomic_assessment.json'
+
+# ---------------------------------------------------------------------------
+# Assembly101 configuration
+# ---------------------------------------------------------------------------
+
+# Supported video file extensions
+ASSEMBLY101_VIDEO_EXTENSIONS = {'.mp4', '.avi', '.mov', '.mkv', '.webm'}
+
+# Assembly101 output subdirectories
+ASSEMBLY101_OUTPUT_DIR = OUTPUT_DIR / 'assembly101'
+ASSEMBLY101_FRAMES_DIR = ASSEMBLY101_OUTPUT_DIR / 'extracted_frames'
+ASSEMBLY101_PREDICTIONS_DIR = ASSEMBLY101_OUTPUT_DIR / 'predictions'
+ASSEMBLY101_FIGURES_DIR = ASSEMBLY101_OUTPUT_DIR / 'figures'
+ASSEMBLY101_METRICS_DIR = ASSEMBLY101_OUTPUT_DIR / 'metrics'
+ASSEMBLY101_FAILURE_CASES_DIR = ASSEMBLY101_OUTPUT_DIR / 'failure_cases'
+
+# Frame extraction defaults
+ASSEMBLY101_DEFAULT_SAMPLING_RATE = 1.0       # frames per second
+ASSEMBLY101_DEFAULT_MAX_VIDEOS = 5             # max videos to process
+ASSEMBLY101_DEFAULT_MAX_FRAMES_PER_VIDEO = 100 # max frames per video
+
+# Frame quality filtering
+ASSEMBLY101_BLUR_THRESHOLD = 100.0             # Laplacian variance threshold (lower = blurrier)

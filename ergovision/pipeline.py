@@ -73,18 +73,15 @@ class ErgoPipeline:
                 score_result = self.scorer.score(person['keypoints'])
                 person_data = {
                     'person': idx,
-                    'risk_class': score_result['risk_class'],
-                    'risk_score': score_result['risk_score'],
-                    'features': score_result['features'],
-                    'explanations': score_result['explanations'],
+                    **score_result,
                 }
                 entry['people'].append(person_data)
 
                 if verbose:
                     name = Path(det['image_path']).name
                     print(f"  {name}  person {idx}: "
-                          f"{score_result['risk_class']} "
-                          f"({score_result['risk_score']:.3f})")
+                          f"{score_result['final_risk_class']} "
+                          f"(score {score_result['final_score']})")
 
             results.append(entry)
         self.results = results
@@ -120,7 +117,8 @@ class ErgoPipeline:
             if res['people']:
                 p = res['people'][0]
                 image = draw_risk_info(
-                    image, p['risk_class'], p['risk_score'], p['explanations']
+                    image, p['final_risk_class'], p['final_score'],
+                    p['explanation']
                 )
 
             out_path = VISUALIZATION_DIR / Path(det['image_path']).name
@@ -133,14 +131,13 @@ class ErgoPipeline:
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
         fieldnames = [
-            'image_path', 'person', 'risk_class', 'risk_score',
-            'torso_angle_value', 'torso_angle_score', 'torso_angle_explanation',
-            'neck_angle_value', 'neck_angle_score', 'neck_angle_explanation',
-            'knee_angle_value', 'knee_angle_score', 'knee_angle_explanation',
-            'shoulder_asymmetry_value', 'shoulder_asymmetry_score',
-            'shoulder_asymmetry_explanation',
-            'body_inclination_value', 'body_inclination_score',
-            'body_inclination_explanation',
+            'image_path',
+            'torso_angle', 'neck_angle', 'knee_angle',
+            'shoulder_asymmetry', 'body_inclination',
+            'torso_score', 'neck_score', 'knee_score',
+            'shoulder_score', 'body_inclination_score',
+            'final_score', 'final_risk_class',
+            'explanation', 'unavailable_features',
         ]
 
         with open(CSV_OUTPUT, 'w', newline='', encoding='utf-8') as f:
@@ -149,18 +146,24 @@ class ErgoPipeline:
 
             for res in results:
                 for p in res['people']:
+                    ps = p['partial_scores']
                     row = {
                         'image_path': res['image_path'],
-                        'person': p['person'],
-                        'risk_class': p['risk_class'],
-                        'risk_score': p['risk_score'],
+                        'torso_angle':   ps.get('torso_angle', {}).get('value', ''),
+                        'neck_angle':    ps.get('neck_angle', {}).get('value', ''),
+                        'knee_angle':    ps.get('knee_angle', {}).get('value', ''),
+                        'shoulder_asymmetry': ps.get('shoulder_asymmetry', {}).get('value', ''),
+                        'body_inclination':   ps.get('body_inclination', {}).get('value', ''),
+                        'torso_score':   ps.get('torso_angle', {}).get('score', ''),
+                        'neck_score':    ps.get('neck_angle', {}).get('score', ''),
+                        'knee_score':    ps.get('knee_angle', {}).get('score', ''),
+                        'shoulder_score':    ps.get('shoulder_asymmetry', {}).get('score', ''),
+                        'body_inclination_score': ps.get('body_inclination', {}).get('score', ''),
+                        'final_score':       p['final_score'],
+                        'final_risk_class':  p['final_risk_class'],
+                        'explanation':       p['explanation'],
+                        'unavailable_features': ', '.join(p['unavailable_features']),
                     }
-                    for feat in ['torso_angle', 'neck_angle', 'knee_angle',
-                                 'shoulder_asymmetry', 'body_inclination']:
-                        fd = p['features'].get(feat, {})
-                        row[f'{feat}_value'] = fd.get('value', '')
-                        row[f'{feat}_score'] = fd.get('score', '')
-                        row[f'{feat}_explanation'] = fd.get('explanation', '')
                     writer.writerow(row)
 
         if verbose:
@@ -177,7 +180,8 @@ class ErgoPipeline:
         counts = {'Low Risk': 0, 'Medium Risk': 0, 'High Risk': 0}
         for r in results:
             for p in r['people']:
-                counts[p['risk_class']] = counts.get(p['risk_class'], 0) + 1
+                counts[p['final_risk_class']] = \
+                    counts.get(p['final_risk_class'], 0) + 1
 
         print("\n" + "=" * 60)
         print("SUMMARY")

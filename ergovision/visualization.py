@@ -59,9 +59,16 @@ def draw_skeleton(image, keypoints, confidence=None, conf_threshold=0.3):
     return img
 
 
-def draw_risk_info(image, risk_class, risk_score, explanations):
+def draw_risk_info(image, risk_class, final_score, explanation):
     """
-    Overlay risk badge (top-left) and explanation lines (bottom).
+    Overlay risk badge (top-left) and explanation text (bottom).
+
+    Parameters
+    ----------
+    image : np.ndarray  (H, W, 3)  BGR.
+    risk_class : str  ``'Low Risk'`` | ``'Medium Risk'`` | ``'High Risk'``.
+    final_score : int  1, 2, or 3 (the maximum partial score).
+    explanation : str  Single human-readable explanation string.
 
     Returns
     -------
@@ -69,7 +76,7 @@ def draw_risk_info(image, risk_class, risk_score, explanations):
     """
     img = image.copy()
     color = RISK_COLORS.get(risk_class, (255, 255, 255))
-    label = f"{risk_class}  (score: {risk_score:.2f})"
+    label = f"{risk_class}  (score: {final_score})"
 
     # Top-left badge
     (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
@@ -77,16 +84,32 @@ def draw_risk_info(image, risk_class, risk_score, explanations):
     cv2.putText(img, label, (10, 10 + th),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
 
-    # Bottom explanation lines
-    if explanations:
-        h, w = img.shape[:2]
-        for i, exp in enumerate(explanations):
-            text = exp if len(exp) <= 65 else exp[:62] + "..."
-            (tw2, th2), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)
-            y = h - 20 * (len(explanations) - i) - 5
+    # Bottom explanation — word-wrap at ~65 chars
+    h, w = img.shape[:2]
+    words = explanation.split()
+    lines = []
+    current = ''
+    for word in words:
+        test = current + ' ' + word if current else word
+        if len(test) <= 65:
+            current = test
+        else:
+            lines.append(current)
+            current = word
+    if current:
+        lines.append(current)
+
+    if lines:
+        for i, line in enumerate(lines):
+            if i >= 10:   # don't overflow the image
+                break
+            (tw2, th2), _ = cv2.getTextSize(
+                line, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1
+            )
+            y = h - 20 * (len(lines) - i) - 5
             cv2.rectangle(img, (5, y - th2 - 4),
                           (10 + tw2, y + 4), TEXT_BG_COLOR, -1)
-            cv2.putText(img, text, (8, y),
+            cv2.putText(img, line, (8, y),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.45, TEXT_COLOR, 1)
 
     return img

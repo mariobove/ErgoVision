@@ -2,9 +2,15 @@
 outputs/visualizations/
 outputs/*.csv
 outputs/*.json
+outputs/assembly101/extracted_frames/
+outputs/assembly101/predictions/
+outputs/assembly101/figures/
+outputs/assembly101/metrics/
+outputs/assembly101/failure_cases/
 __pycache__/
 *.pyc
 .env
 *.egg-info/
 dist/
 build/
+*.pt
