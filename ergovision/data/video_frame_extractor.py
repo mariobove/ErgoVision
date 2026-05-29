@@ -11,7 +11,9 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from ..config import ASSEMBLY101_BLUR_THRESHOLD, ASSEMBLY101_FRAMES_DIR
+# Default paths (overridable via constructor)
+_DEFAULT_FRAMES_DIR = 'outputs/extracted_frames'
+_DEFAULT_BLUR_THRESHOLD = 0  # disabled by default
 
 
 def _laplacian_variance(image):
@@ -60,7 +62,7 @@ class VideoFrameExtractor:
     Parameters
     ----------
     output_dir : str or Path
-        Root directory for extracted frames (default: ``outputs/assembly101/extracted_frames/``).
+        Root directory for extracted frames (default: ``outputs/extracted_frames/``).
     sampling_rate : float
         Target frames per second to extract (default: 1.0).
     max_frames_per_video : int
@@ -72,11 +74,11 @@ class VideoFrameExtractor:
 
     def __init__(self, output_dir=None, sampling_rate=1.0,
                  max_frames_per_video=100, blur_threshold=None):
-        self.output_dir = Path(output_dir or ASSEMBLY101_FRAMES_DIR)
+        self.output_dir = Path(output_dir or _DEFAULT_FRAMES_DIR)
         self.sampling_rate = sampling_rate
         self.max_frames_per_video = max_frames_per_video
         self.blur_threshold = blur_threshold if blur_threshold is not None \
-            else ASSEMBLY101_BLUR_THRESHOLD
+            else _DEFAULT_BLUR_THRESHOLD
 
     def extract(self, video_path, video_name=None):
         """

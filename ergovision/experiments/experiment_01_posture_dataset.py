@@ -6,8 +6,8 @@ image dataset.  Produces a predictions CSV, risk distribution figure, and a
 set of sample visualisations.
 
 This experiment establishes a baseline for posture-based risk scoring on a
-controlled image dataset before moving to the more challenging Assembly101
-video data.
+controlled image dataset for future extension to video-based
+assessment.
 """
 
 from pathlib import Path

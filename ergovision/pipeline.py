@@ -493,12 +493,30 @@ class ErgoPipeline:
 
                 row['risk_score'] = score_result['final_score']
                 row['risk_level'] = risk_level_short
+                row['action_level'] = score_result.get('action_level', '')
                 row['discarded'] = discarded
                 row['discard_reason'] = discard_reason
                 row['postural_severity'] = score_result.get('continuous_severity', '')
                 row['smoothed_severity'] = score_result.get('smoothed_severity',
                                            score_result.get('continuous_severity', ''))
                 row['pose_confidence'] = score_result.get('confidence', '')
+
+                # Segment scores
+                row['trunk_score'] = score_result.get('trunk_score', '')
+                row['neck_score'] = score_result.get('neck_score', '')
+                row['upper_arm_score'] = score_result.get('upper_arm_score', '')
+                row['forearm_score'] = score_result.get('forearm_score', '')
+                row['leg_score'] = score_result.get('leg_score', '')
+
+                # Debug fields
+                row['action_level'] = score_result.get('action_level', '')
+                row['action_level_reason'] = score_result.get('action_level_reason', '')
+                row['approximate_action_level'] = score_result.get('approximate_action_level', '')
+                row['neutral_gate_applied'] = score_result.get('neutral_gate_applied', False)
+                row['neck_capped'] = score_result.get('neck_capped', False)
+                row['primary_risk_drivers'] = '; '.join(score_result.get('primary_risk_drivers', []))
+                row['secondary_risk_drivers'] = '; '.join(score_result.get('secondary_risk_drivers', []))
+                row['mapping_consistent'] = score_result.get('mapping_consistent', True)
 
                 row['_partial_scores'] = ps
                 row['_explanation'] = score_result['explanation']
@@ -525,6 +543,7 @@ class ErgoPipeline:
             all_rows = temporal_smooth_severity(
                 all_rows,
                 alpha=cfg.ema_alpha,
+                decay_alpha=cfg.ema_decay_alpha,
                 severity_low_max=cfg.severity_low_max,
                 severity_medium_max=cfg.severity_medium_max,
             )
@@ -651,8 +670,14 @@ class ErgoPipeline:
             'forearm_angle_left', 'forearm_angle_right',
             'knee_angle_left', 'knee_angle_right',
             'shoulder_asymmetry', 'body_inclination',
+            'trunk_score', 'neck_score', 'upper_arm_score',
+            'forearm_score', 'leg_score',
             'postural_severity', 'smoothed_severity', 'pose_confidence',
-            'risk_score', 'risk_level',
+            'risk_score', 'risk_level', 'action_level',
+            'action_level_reason', 'approximate_action_level',
+            'neutral_gate_applied', 'neck_capped',
+            'primary_risk_drivers', 'secondary_risk_drivers',
+            'mapping_consistent',
             'discarded', 'discard_reason',
         ]
         output_path.parent.mkdir(parents=True, exist_ok=True)

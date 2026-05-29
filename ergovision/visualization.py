@@ -11,7 +11,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from .config import SKELETON, RISK_CLASSES
+from .config import SKELETON, RISK_CLASSES, RISK_COLOUR_MAP
 
 # BGR colours
 KEYPOINT_COLOR = (0, 255, 0)          # green
@@ -19,16 +19,15 @@ SKELETON_COLOR = (255, 255, 0)        # cyan
 TEXT_COLOR = (255, 255, 255)          # white
 TEXT_BG_COLOR = (0, 0, 0)            # black
 BBOX_COLOR = (0, 255, 255)            # yellow
-RISK_COLORS = {
-    'Low Risk': (0, 255, 0),          # green
-    'Medium Risk': (0, 255, 255),     # yellow
-    'High Risk': (0, 0, 255),         # red
-}
-RISK_COLORS_SHORT = {
-    'LOW': (0, 255, 0),
-    'MEDIUM': (0, 255, 255),
-    'HIGH': (0, 0, 255),
-}
+
+# RISK_COLOUR_MAP from config is the single source of truth:
+#   {1: green, 2: yellow, 3: red}
+RISK_COLORS = {}
+RISK_COLORS_SHORT = {}
+for score, color in RISK_COLOUR_MAP.items():
+    RISK_COLORS[RISK_CLASSES[score - 1]] = color
+    key = {1: 'LOW', 2: 'MEDIUM', 3: 'HIGH'}[score]
+    RISK_COLORS_SHORT[key] = color
 
 
 def draw_skeleton(image, keypoints, confidence=None, conf_threshold=0.3):

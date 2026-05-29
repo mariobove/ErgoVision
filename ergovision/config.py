@@ -64,107 +64,66 @@ SKELETON = [
 ]
 
 # ===================================================================
-# Fuzzy inference: trapezoidal membership functions
+# Angle severity thresholds for conservative rule-based scoring
 # ===================================================================
 #
-# Each membership function is (a, b, c, d) for a trapezoid:
-#   mu = 0 for x <= a, ramps 0→1 for a→b, mu = 1 for b→c, ramps 1→0 for c→d
+# Thresholds define the boundaries between risk levels for each feature.
+# Values are in degrees unless otherwise noted.
 #
-# Cut-points aligned with RULA / REBA / OWAS thresholds from the
-# ergonomics literature (see Li et al. 2024, Menanno et al. 2024).
+# Calibrated on RULA / REBA / OWAS cut-points from the literature:
+#   McAtamney & Corlett (1993) — RULA
+#   Hignett & McAtamney (2000) — REBA
+#   Karhu et al. (1977) — OWAS
+#
+# Each feature has three thresholds:
+#   low_max      — maximum angle considered neutral / low risk
+#   medium_max   — maximum angle considered moderate (monitoring zone)
+#   extreme_min  — minimum angle for "extreme" classification
+#                  (used for continuous severity scaling)
+# Between low_max and medium_max the risk is MEDIUM.
+# Above medium_max the risk is HIGH.
 
-FUZZY_MEMBERSHIPS = {  # feature -> { lingvar -> (a,b,c,d) }
-    'trunk_angle': {
-        'neutral':  ( 0,  0, 10, 20),
-        'moderate': (15, 25, 35, 45),
-        'high':     (35, 45, 60, 80),
-        'extreme':  (60, 80, 180, 180),
-    },
-    'neck_angle': {
-        'neutral':  ( 0,  0,  5, 10),
-        'moderate': ( 8, 15, 25, 35),
-        'high':     (25, 35, 50, 70),
-        'extreme':  (50, 70, 180, 180),
-    },
-    'upper_arm_angle': {
-        'neutral':  ( 0,  0, 10, 20),
-        'moderate': (15, 30, 45, 60),
-        'high':     (45, 60, 80, 100),
-        'extreme':  (80, 100, 180, 180),
-    },
-    'forearm_deviation': {
-        'neutral':  ( 0,  0, 15, 30),
-        'moderate': (20, 40, 60, 80),
-        'high':     (60, 80, 100, 120),
-        'extreme':  (100, 120, 180, 180),
-    },
-    'knee_bend': {
-        'neutral':  ( 0,  0, 10, 20),
-        'moderate': (15, 30, 45, 60),
-        'high':     (45, 60, 90, 120),
-        'extreme':  (90, 120, 180, 180),
-    },
-    # Note: shoulder_asymmetry and body_inclination only have
-    # 3 labels (no 'extreme') — these are secondary modifiers.
-    'shoulder_asymmetry': {
-        'neutral':  ( 0,  0,  5, 10),
-        'moderate': ( 8, 15, 25, 35),
-        'high':     (25, 35, 50, float('inf')),
-    },
-    'body_inclination': {
-        'neutral':  ( 0,  0,  5, 10),
-        'moderate': ( 8, 15, 25, 35),
-        'high':     (25, 35, 50, float('inf')),
-    },
+TRUNK_ANGLE_THRESHOLDS = {
+    'low_max': 20,
+    'medium_max': 60,
+    'extreme_min': 80,
 }
 
-# Output risk membership (continuous 0-100 severity)
-RISK_MEMBERSHIPS = {
-    'very_low':   ( 0,  0,  5, 15),
-    'low':        (10, 20, 30, 40),
-    'medium':     (30, 45, 55, 65),
-    'high':       (55, 65, 75, 85),
-    'very_high':  (75, 85, 100, 100),
+NECK_ANGLE_THRESHOLDS = {
+    'low_max': 15,
+    'medium_max': 45,
+    'extreme_min': 60,
 }
 
-# Rule base: list of (antecedents, consequent)
-# antecedents = [(feature, linguistic_var), ...]  (AND-connected)
-# consequent  = linguistic_var from RISK_MEMBERSHIPS
-FUZZY_RULES = [
-    # --- CRITICAL: single extreme primary → very_high ---
-    ([('trunk_angle', 'extreme')], 'very_high'),
-    ([('neck_angle', 'extreme')], 'very_high'),
-    ([('upper_arm_angle', 'extreme')], 'very_high'),
+ARM_ANGLE_THRESHOLDS = {
+    'low_max': 20,
+    'medium_max': 60,
+    'extreme_min': 90,
+}
 
-    # --- HIGH: combined high/moderate primaries → high-to-very_high ---
-    ([('trunk_angle', 'high'), ('upper_arm_angle', 'moderate')], 'very_high'),
-    ([('neck_angle', 'high'), ('upper_arm_angle', 'moderate')],  'very_high'),
-    ([('trunk_angle', 'high'), ('neck_angle', 'moderate')], 'very_high'),
-    ([('neck_angle', 'high'), ('trunk_angle', 'moderate')], 'very_high'),
-    ([('trunk_angle', 'moderate'), ('upper_arm_angle', 'high')], 'very_high'),
-    ([('neck_angle',  'moderate'), ('upper_arm_angle', 'high')], 'very_high'),
-    ([('upper_arm_angle',   'high'), ('forearm_deviation', 'high')],       'very_high'),
+FOREARM_DEVIATION_THRESHOLDS = {
+    'low_max': 30,
+    'medium_max': 90,
+    'extreme_min': 120,
+}
 
-    # --- MEDIUM-HIGH: single high primary ---
-    ([('trunk_angle', 'high')],  'high'),
-    ([('neck_angle',  'high')],  'high'),
-    ([('upper_arm_angle',   'high')],  'high'),
-    ([('trunk_angle', 'moderate'), ('neck_angle', 'moderate')], 'high'),
-    ([('trunk_angle', 'moderate'), ('upper_arm_angle', 'moderate')],  'high'),
-    ([('neck_angle',  'moderate'), ('upper_arm_angle', 'moderate')],  'high'),
+KNEE_BEND_THRESHOLDS = {
+    'low_max': 15,
+    'medium_max': 45,
+    'extreme_min': 60,
+}
 
-    # --- MEDIUM: moderate primary + secondary escalation ---
-    ([('trunk_angle', 'moderate')],                    'medium'),
-    ([('neck_angle',  'moderate')],                    'medium'),
-    ([('upper_arm_angle',   'moderate')],                    'medium'),
-    ([('trunk_angle', 'moderate'), ('forearm_deviation', 'high')], 'medium'),
-    ([('neck_angle',  'moderate'), ('forearm_deviation', 'high')], 'medium'),
-    ([('knee_bend',        'extreme')],                      'medium'),
-    ([('knee_bend',        'high'), ('trunk_angle', 'moderate')], 'medium'),
+SHOULDER_ASYMMETRY_THRESHOLDS = {
+    'low_max': 10,
+    'medium_max': 25,
+    'extreme_min': 40,
+}
 
-    # --- LOW: needs at least neutral trunk/neck (primaries covered) ---
-    ([('trunk_angle', 'neutral'), ('neck_angle', 'neutral')], 'low'),
-]
+BODY_INCLINATION_THRESHOLDS = {
+    'low_max': 10,
+    'medium_max': 25,
+    'extreme_min': 40,
+}
 
 
 # Legacy thresholds (kept for backward-compatible partial scores)
@@ -183,16 +142,27 @@ SHOULDER_ASYMMETRY_THRESHOLDS = {
 INCLINATION_THRESHOLDS = {
     'low': (0, 10), 'medium': (10, 25), 'high': (25, float('inf')),
 }
-UPPER_ARM_THRESHOLDS = {
+LEGACY_UPPER_ARM_THRESHOLDS = {
     'low': (0, 20), 'medium': (20, 60), 'high': (60, 180),
 }
 FOREARM_THRESHOLDS = {
     'low': (0, 30), 'medium': (30, 90), 'high': (90, 180),
 }
 
-# Risk class labels (score 1 -> Low Risk, 2 -> Medium Risk, 3 -> High Risk, 0 -> Uncertain)
-RISK_CLASSES = ['Low Risk', 'Medium Risk', 'High Risk']
-RISK_LEVEL_SHORT = {1: 'LOW', 2: 'MEDIUM', 3: 'HIGH'}
+# Risk class labels (score 1 -> Low Risk, 2 -> Medium Risk, 3 -> High Risk)
+# Risk class labels (RULA-inspired Action Levels)
+#   score 1 = AL1 (Low Risk)    — acceptable, no action needed
+#   score 2 = AL2 (Medium Risk)  — further investigation recommended
+#   score 3 = AL3+ (High Risk)   — investigation and changes required
+RISK_CLASSES = ['AL1 (Low Risk)', 'AL2 (Medium Risk)', 'AL3+ (High Risk)']
+RISK_LEVEL_SHORT = {1: 'AL1 (LOW)', 2: 'AL2 (MEDIUM)', 3: 'AL3+ (HIGH)'}
+
+# Central colour mapping (single source of truth for overlays)
+RISK_COLOUR_MAP = {
+    1: (0, 255, 0),     # GREEN
+    2: (0, 255, 255),   # YELLOW
+    3: (0, 0, 255),     # RED
+}
 
 # Feature names used in score output
 ALL_ANGLE_FEATURES = [
@@ -262,13 +232,13 @@ class ExperimentConfig:
         self.keypoint_confidence = 0.3
         self.min_valid_keypoints = 8
 
-        # Temporal smoothing (EMA)
+        # Temporal smoothing (asymmetric EMA)
         self.temporal_smoothing = True
-        self.ema_alpha = 0.35
+        self.ema_alpha = 0.25       # slower rise
+        self.ema_decay_alpha = 0.50 # faster decay when raw drops
         self.smooth_window = 5  # frames
 
         # Postural risk thresholds (0-100 severity → class)
-        # Aligned with fuzzy inference cut-points: <35 → LOW, 35-65 → MEDIUM, >65 → HIGH
         self.severity_low_max = 35
         self.severity_medium_max = 65
 

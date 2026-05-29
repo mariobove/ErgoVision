@@ -67,14 +67,21 @@ def compute_statistics(rows):
         if vals:
             angle_stats[col] = _safe_stat(vals)
 
-    # Risk distribution
-    risk_levels = [r.get('risk_level', 'UNKNOWN') for r in rows]
-    risk_counts = Counter(risk_levels)
+    # Risk distribution (from numeric risk_score — robust to label changes)
+    risk_scores = []
+    for r in rows:
+        s = r.get('risk_score')
+        if s is not None and str(s).strip() and str(s) != 'None':
+            try:
+                risk_scores.append(int(s))
+            except (ValueError, TypeError):
+                pass
+    risk_counts = Counter(risk_scores)
     total = len(rows)
     risk_dist = {}
-    for level in ['LOW', 'MEDIUM', 'HIGH']:
-        cnt = risk_counts.get(level, 0)
-        risk_dist[level] = {
+    for score, label in [(1, 'LOW'), (2, 'MEDIUM'), (3, 'HIGH')]:
+        cnt = risk_counts.get(score, 0)
+        risk_dist[label] = {
             'count': cnt,
             'percentage': round((cnt / total * 100) if total > 0 else 0, 2),
         }
@@ -146,11 +153,19 @@ def plot_risk_distribution(rows, output_path,
     """Bar chart of LOW / MEDIUM / HIGH counts."""
     plt = _import_plt()
 
-    risk_levels = [r.get('risk_level', 'UNKNOWN') for r in rows]
-    counts = Counter(risk_levels)
+    # Use numeric risk_score for robustness against label changes
+    scores = []
+    for r in rows:
+        s = r.get('risk_score')
+        if s is not None and str(s).strip() and str(s) != 'None':
+            try:
+                scores.append(int(s))
+            except (ValueError, TypeError):
+                pass
+    sc = Counter(scores)
     levels = ['LOW', 'MEDIUM', 'HIGH']
     colors = ['#2ecc71', '#f1c40f', '#e74c3c']
-    values = [counts.get(l, 0) for l in levels]
+    values = [sc.get(1, 0), sc.get(2, 0), sc.get(3, 0)]
 
     fig, ax = plt.subplots(figsize=(8, 5))
     bars = ax.bar(levels, values, color=colors, edgecolor='gray', width=0.6)
@@ -175,7 +190,16 @@ def plot_risk_by_video(rows, output_path):
     video_risk = {}
     for r in rows:
         vid = r.get('video_id', 'unknown')
-        level = r.get('risk_level', 'UNKNOWN')
+        raw_level = r.get('risk_level', 'UNKNOWN')
+        # Normalise level labels for backward compat
+        if raw_level.startswith('AL1'):
+            level = 'LOW'
+        elif raw_level.startswith('AL2'):
+            level = 'MEDIUM'
+        elif raw_level.startswith('AL3'):
+            level = 'HIGH'
+        else:
+            level = raw_level
         if vid not in video_risk:
             video_risk[vid] = Counter()
         video_risk[vid][level] += 1

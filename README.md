@@ -5,8 +5,8 @@
 **Domain:** Computer vision, ergonomics, biomechanics, industry 5.0
 
 ```
-Human Detection  →  Pose Estimation  →  Fuzzy Risk Inference  →  Temporal Smoothing
-     YOLOv8            YOLOv8-pose         Mamdani FIS               EMA
+Human Detection  →  Pose Estimation  →  Rule-Based Risk Scoring  →  Temporal Smoothing
+     YOLOv8            YOLOv8-pose      Conservative Angle Thresholds    Asymmetric EMA
 ```
 
 ---
@@ -23,10 +23,10 @@ Human Detection  →  Pose Estimation  →  Fuzzy Risk Inference  →  Temporal 
 8. [Pose Estimation](#8-pose-estimation)
 9. [Pose Quality Validation](#9-pose-quality-validation)
 10. [Joint Angle Computation](#10-joint-angle-computation)
-11. [Risk Model: Mamdani Fuzzy Inference System](#11-risk-model-mamdani-fuzzy-inference-system)
+11. [Risk Model: Conservative Rule-Based Scoring](#11-risk-model-conservative-rule-based-scoring)
 12. [Feature Weighting Strategy](#12-feature-weighting-strategy)
-13. [Membership Functions and Threshold Calibration](#13-membership-functions-and-threshold-calibration)
-14. [Fuzzy Rule Base](#14-fuzzy-rule-base)
+13. [Severity Thresholds and Decision Criteria](#13-severity-thresholds-and-decision-criteria)
+14. [Explicit Risk Decision Rules](#14-explicit-risk-decision-rules)
 15. [Temporal Smoothing](#15-temporal-smoothing)
 16. [Risk Persistence](#16-risk-persistence)
 17. [Final Risk Classification](#17-final-risk-classification)
@@ -115,19 +115,27 @@ The system is designed for Industry 5.0 environments where human-centric manufac
 
 ### 2.4 Relation to State of the Art (2024--2025)
 
-The current state of the art in vision-based ergonomic assessment is represented by:
+Recent systematic reviews have established **human pose estimation (HPE)** as a viable non-invasive and scalable approach for automating ergonomic risk assessment (ERA) in industrial environments.
 
-- **Li et al. (2024)** [18]: Data-driven ergonomic assessment using Heuristic Gaussian Cloud Transformation (H-GCT) + fuzzy inference. Published in *Automation in Construction*. This paper directly addresses the limitations of discrete RULA/REBA boundaries using data-driven membership functions and fuzzy aggregation.
+**Deshpande et al. (2025)** [28] conducted a PRISMA systematic review of 32 studies on machine learning techniques for HPE-based ERA, concluding that deep learning HPE systems show promising accuracy for posture classification but face challenges including real-time processing, occluded images, dataset diversity, and generalisation across industrial environments. Their review maps the standard pipeline as:
 
-- **Menanno et al. (2024)** [19]: RULA-based fuzzy inference engine + VideoPose3D for continuous criticality index. Published in *Applied Sciences*. Validated in real assembly line with 13% ergonomic stress reduction.
+```
+RGB/video → HPE → joint angles → ergonomic risk estimation (RULA/REBA/OWAS)
+```
 
-- **Agostinelli et al. (2024)** [20]: Validation of computer-vision-based ergonomic risk assessment in real manufacturing. Published in *Scientific Reports*. Documents the lab-to-real accuracy gap (80--97% lab vs. 29--80% real).
+This pipeline structure directly motivates ErgoVision's architecture.
 
-- **Murugan et al. (2024)** [21]: Comparison of four monocular 3D pose methods for RULA. Published in *Ergonomics*. Demonstrates that side-camera position minimises angle error.
+**Iyer & Jeong (2025)** [29] performed a PRISMA review and meta-analysis of HPE models (OpenPose, MediaPipe, AlphaPose) for ERA and workplace safety. Their meta-analysis found a significant reduction in musculoskeletal disorder prevalence from HPE-based ergonomic interventions (standardised mean difference of −0.71 in pre-post studies). They also conducted a scoping review of 84 studies on automation technologies for ergonomic assessment [30], confirming that computer vision and wearable sensors improve data collection, analysis, and validation accuracy.
 
-- **Cruciata et al. (2025)** [22]: Lightweight Vision Transformer for direct RGB-to-risk mapping. Published in *Sensors*. Achieves F1 > 0.99 without intermediate keypoint estimation.
+Additional state-of-the-art contributions include:
 
-ErgoVision differentiates itself by: (a) remaining fully rule-based and interpretable (unlike end-to-end ViT approaches), (b) using fuzzy inference for non-linear aggregation (aligned with Li et al. and Menanno et al.), and (c) introducing continuous confidence propagation (absent in most prior work).
+- **Li et al. (2024)** [18]: Data-driven ergonomic assessment using Heuristic Gaussian Cloud Transformation (H-GCT) + fuzzy inference. Published in *Automation in Construction*.
+- **Menanno et al. (2024)** [19]: RULA-based fuzzy inference engine + VideoPose3D for continuous criticality index. Published in *Applied Sciences*.
+- **Agostinelli et al. (2024)** [20]: Validation of computer-vision-based ergonomic risk assessment in real manufacturing. Published in *Scientific Reports*.
+- **Massiris Fernández et al. (2020)** [31]: Automated RULA scoring from RGB video using OpenPose + CNN. Published in *Computers & Industrial Engineering*.
+- **Li et al. (2020)** [32]: End-to-end deep learning for RULA action level prediction from 2D joint coordinates. Published in *Applied Ergonomics*.
+
+ErgoVision differentiates itself by: (a) remaining fully rule-based and interpretable (unlike end-to-end deep learning approaches), (b) using conservative explicit decision rules instead of black-box regression, (c) introducing continuous confidence propagation, and (d) mapping its three-level output to approximate RULA Action Levels for industrial interpretability.
 
 ---
 
@@ -139,6 +147,11 @@ ErgoVision differentiates itself by: (a) remaining fully rule-based and interpre
 | **Menanno et al.** [19] | 2024 | Fuzzy RULA criticality index + cobot integration | Custom assembly line | VP3D + fuzzy inference engine (FIE) | Single case study; no uncertainty handling | Direct precursor. ErgoVision adds continuous confidence |
 | **Agostinelli et al.** [20] | 2024 | Benchmark CV tools for ERA in real manufacturing | Real manufacturing lines | tf-pose + RULA | Lab-to-real gap documented (29--80%) | Informed our confidence model and lab-to-real gap discussion |
 | **Murugan et al.** [21] | 2024 | Camera position sensitivity for RULA | Custom lab tasks | BlazePose, VP3D, 3D-pose-baseline, PSTMO | Lab-only; single tasks | Side camera guidance; VP3D as future upgrade path |
+| **Deshpande et al.** [28] | 2025 | PRISMA review: ML for HPE-based ERA | 32 studies (2012--2024) | Systematic review of HPE → ERA pipeline | No novel method; identifies occlusion, real-time, generalisation gaps | Validates the pipeline: RGB → HPE → angles → RULA/REBA |
+| **Iyer & Jeong** [29] | 2025 | PRISMA review + meta-analysis of HPE for ERA | 84 studies | Meta-analysis of HPE models (OpenPose, MediaPipe, AlphaPose) | Heterogeneous accuracy reporting across studies | Confirms WMSD reduction from HPE-based interventions |
+| **Iyer & Jeong (scoping)** [30] | 2025 | Scoping review: automation of ergonomic assessments | 84 studies | CV + wearable sensors for ERA | Epidemiological validation still needed | Confirms automation improves data collection accuracy |
+| **Massiris Fernández et al.** [31] | 2020 | Automated RULA from RGB video | CG + real-world outdoor | OpenPose + CNN, 25-joint skeleton | Cohen's κ > 0.6; moderate agreement | Strong baseline: our approach uses explicit angle rules instead of learned scoring |
+| **Li et al. (2D→RULA)** [32] | 2020 | End-to-end RULA from 2D joints | Lab + Human3.6 | CNN-based RULA estimator on OpenPose | Needs task-specific training data | Our rule-based approach needs no training data |
 | **Cruciata et al.** [22] | 2025 | Direct RGB-to-risk ViT | Simulated industrial + IMU | Lightweight ViT, RGB-to-8-region | Requires task-specific training; no rule-based interpretability | Opposite approach: end-to-end vs. our rule-based. Trade-off: accuracy vs. transparency |
 | **González-Alonso et al. (ME-WARD)** [23] | 2025 | Multimodal RULA (IMU + monocular 3D) | Real conveyor belt | NVIDIA Maxine + RULA | Monocular weak on lateral/rotational | Validates that monocular works for flexion-dominated movements |
 | **Agostinelli et al.** [24] | 2024 | CV for RULA in manufacturing | Real production lines | OpenPose + custom scoring | 60% score accuracy in real environments | Baseline for our accuracy expectations on real data |
@@ -323,9 +336,11 @@ ErgoVision implements a six-stage pipeline:
 └──────────────────────────┬──────────────────────────────────┘
                            ↓
 ┌─────────────────────────────────────────────────────────────┐
-│  Stage 6: Fuzzy Risk Inference                               │
-│  - Mamdani FIS with 25 rules                                 │
-│  - Trapezoidal membership functions (RULA-aligned)           │
+│  Stage 6: Rule-Based Risk Scoring                            │
+│  - Conservative angle thresholds (RULA-aligned)              │
+│  - Neutral posture gate for safe postures                    │
+│  - Explicit HIGH/MEDIUM/LOW criteria on raw angles           │
+│  - Biomechanical caps (neck alone, secondaries only)         │
 │  - Continuous severity 0-100 + discrete class Low/Med/High   │
 │  - Pose confidence 0-1                                       │
 └──────────────────────────┬──────────────────────────────────┘
@@ -363,7 +378,7 @@ The single-stage mode (YOLOv8n-pose on full frames) is maintained for backward c
 | Human detection | RGB frame (H×W×3) | List of [x1,y1,x2,y2,confidence] |
 | Pose estimation | RGB crop (padded) | 17×3 keypoints (x, y, conf) |
 | Joint angles | 17 keypoints | 10 angle features (trunk, neck, etc.) |
-| Risk inference | 10 angle features | severity (0--100), class (L/M/H), confidence (0--1) |
+| Risk inference | 10 angle features | severity, class (L/M/H), confidence, debug fields |
 
 ---
 
@@ -574,13 +589,27 @@ $$\theta_{\text{trunk}} = \phi\left(\frac{S_l + S_r}{2},\ \frac{H_l + H_r}{2}\ri
 **Keypoints**: nose $N$, mid-shoulder $(S_l + S_r) / 2$
 
 **Formula**:
-$$\theta_{\text{neck}} = \phi\left(N,\ \frac{S_l + S_r}{2}\right)$$
+$$\theta_{\text{neck-absolute}} = \phi\left(N,\ \frac{S_l + S_r}{2}\right)$$
 
-**Biomechanical interpretation**: Forward flexion of the neck relative to the torso. The nose-to-mid-shoulder vector approximates the cervical spine orientation.
+**Relative neck correction**: In side-view industrial footage, the absolute neck angle conflates trunk flexion with cervical flexion. When the trunk is flexed forward (e.g., worker bending to pick up an object), the nose-to-shoulder vector changes even if the neck is aligned with the torso. This produces systematic overestimation of neck-related risk.
 
-**Ergonomic significance**: Neck flexion is scored in RULA (Group B) and is associated with increased cervical spine loading. At 15° flexion, compressive forces increase by approximately 100% compared to neutral [40]. RULA assigns score 2 for flexion >10° and score 3 for >20°.
+Corrected neck angle:
+$$\theta_{\text{neck-relative}} = \max\left(0,\ \theta_{\text{neck-absolute}} - \theta_{\text{trunk}}\right)$$
 
-**2D limitation**: The nose-to-shoulder vector combines cervical and upper thoracic flexion. True neck angle requires separate head and torso orientation estimation.
+The **selected neck angle** is:
+- If $\theta_{\text{trunk}} \leq 15^\circ$: use $\theta_{\text{neck-absolute}}$ (trunk near vertical, no correction needed)
+- If $\theta_{\text{trunk}} > 15^\circ$: use $\theta_{\text{neck-relative}}$ (cervical flexion only)
+
+Neck reliability decreases with trunk angle:
+$$R_{\text{neck}} = \max\left(0,\ 1 - \frac{\theta_{\text{trunk}}}{45^\circ}\right)$$
+
+When $R_{\text{neck}} < 0.5$, the neck contribution to the overall risk score is reduced via the decision rules (no neck-alone HIGH) and biomechanical caps.
+
+**Biomechanical interpretation**: The corrected angle better approximates true cervical spine flexion. In RULA, neck flexion is scored separately from trunk flexion, and the two should not be conflated [3].
+
+**Ergonomic significance**: Neck flexion is associated with increased cervical spine loading. At 15° flexion, compressive forces increase by approximately 100% compared to neutral [40].
+
+**2D limitation**: Even with the relative correction, the nose-to-shoulder vector in 2D combines cervical and upper thoracic flexion. Lateral neck bending is not captured.
 
 #### Upper Arm Angle
 
@@ -662,7 +691,7 @@ $$\text{inclination}_{\text{pct}} = \frac{|S_m^x - H_m^x|}{|S_m^y - H_m^y|} \tim
 | Feature | Type | Derivation | RULA Analog | Notes |
 |---|---|---|---|---|
 | `trunk_angle` | Primary | Vertical deviation of mid-shoulder→mid-hip | RULA trunk score (Table A) | 2D sagittal only |
-| `neck_angle` | Primary | Vertical deviation of nose→mid-shoulder | RULA neck score (Table A) | Combines cervical + thoracic |
+| `neck_angle` | Primary | Vertical deviation of nose→mid-shoulder, corrected relative to trunk when trunk > 15° | RULA neck score (Table A) | Relative-to-trunk correction applied; 2D projection error significant |
 | `upper_arm_angle` | Primary | Vertical deviation of shoulder→elbow | RULA upper arm score | Left/right separate; worst used for inference |
 | `forearm_deviation` | Secondary | Deviation of elbow angle from 90° | RULA lower arm score | Measured as |angle - 90°| |
 | `knee_bend` | Secondary | Deviation of knee from 180° straight | RULA leg score | 180° - interior angle |
@@ -671,55 +700,81 @@ $$\text{inclination}_{\text{pct}} = \frac{|S_m^x - H_m^x|}{|S_m^y - H_m^y|} \tim
 
 ---
 
-## 11. Risk Model: Mamdani Fuzzy Inference System
+## 11. Risk Model: Conservative Rule-Based Scoring
 
-### 11.1 Motivation
+### 11.1 Design Rationale
 
-Prior vision-based ergonomic systems [19,20,24] aggregate per-feature risk scores using **linear weighted sums**:
+Early versions of ErgoVision used a Mamdani Fuzzy Inference System (FIS) for risk
+aggregation, following the approach of Li et al. [18] and Menanno et al. [19].
+While fuzzy inference captures non-linear interactions, it introduced two
+problems in practice:
 
-$$S = \frac{\sum_i w_i \cdot s_i}{\sum_i w_i}$$
+1. **Over-sensitivity**: The fuzzy rule base, even with biomechanical caps,
+   frequently classified frames as HIGH that were borderline moderate, because
+   partial membership in "high" linguistic variables produced non-zero firing
+   strengths.
 
-This approach has a fundamental biomechanical limitation: **risk is not additive**. The linear model cannot capture interactions (e.g., a bent trunk + raised arms produce exponentially higher risk than the sum of their individual contributions) and dilutes peak values (a single severely deviated body region produces a misleadingly low score when averaged with neutral regions).
+2. **Opacity**: The mapping from raw angles to fuzzy membership to rule
+   firing to defuzzified score was difficult to trace and debug.
 
-The state of the art in 2024 [18,19] uses **fuzzy inference systems** (FIS) to overcome these limitations. Li et al. [18] demonstrate that fuzzy aggregation significantly outperforms linear weighted scoring for ergonomic assessment on construction worker data.
+The current version replaces the FIS with **explicit conservative decision
+rules** operating directly on raw joint angles. This approach:
 
-ErgoVision implements a **Mamdani FIS** [46] with trapezoidal membership functions and a rule base inspired by RULA scoring tables.
+- Uses clearly interpretable angle thresholds (e.g., trunk >= 60° → HIGH)
+- Applies a **neutral posture gate** that exits early for safe postures
+- Caps risk from neck alone and secondary features alone
+- Produces LOW for normal walking/standing, MEDIUM for monitoring, and
+  HIGH only for clearly critical or persistent severe postures
 
-### 11.2 Mamdani Fuzzy Inference
+### 11.2 Risk Decision Logic (in order of evaluation)
 
-The Mamdani method [46] operates in four stages:
+```
+Step 1 — Neutral Posture Gate
+  IF trunk < 20° AND upper_arm_max < 45° AND neck < 30° AND inclination < 15%
+     THEN → LOW (immediate exit, unless manual context indicates load/force)
 
-#### Stage 1: Fuzzification
+Step 2 — HIGH Check
+  IF trunk >= 60°                               → HIGH (trunk_severe)
+  ELIF trunk >= 45° AND upper_arm_max >= 60°    → HIGH (trunk_arm_combined)
+  ELIF 2+ primary features with severity >= 55   → HIGH (multiple_primary_severe)
 
-Each input feature $x$ is mapped to membership degrees $\mu_\ell(x)$ in each linguistic variable $\ell$ using trapezoidal membership functions:
+Step 3 — MEDIUM Check
+  IF trunk >= 30°                                → MEDIUM (trunk_moderate)
+  ELIF upper_arm_max >= 45°                      → MEDIUM (arm_moderate)
+  ELIF neck >= 20° AND trunk+arms are low         → MEDIUM (neck_capped)
+  ELIF secondary features severe AND primaries
+       not all neutral                           → MEDIUM (secondary_escalation)
 
-$$\mu_\ell(x) = \begin{cases}
-0 & x < a \\
-\frac{x - a}{b - a} & a \leq x < b \\
-1 & b \leq x \leq c \\
-\frac{d - x}{d - c} & c < x < d \\
-0 & x \geq d
+Step 4 — LOW (fallback)
+  → LOW
+
+Step 5 — Biomechanical Caps (override if needed)
+  - Neck alone severe + trunk/arms low  → force MEDIUM (severity <= 55)
+  - Secondary only severe + primaries
+    below moderate                      → force MEDIUM (severity <= 50)
+  - Trunk < 30° AND arms < 45°          → HIGH forbidden (severity <= 64.9)
+```
+
+### 11.3 Continuous Severity Score
+
+The continuous severity (0--100) is computed independently of the risk class
+for reporting and temporal smoothing:
+
+$$S_{\text{feature}} = \begin{cases}
+0 & \text{if } \theta \leq \theta_{\text{low}} \\
+50 \cdot \frac{\theta - \theta_{\text{low}}}{\theta_{\text{med}} - \theta_{\text{low}}}
+  & \text{if } \theta_{\text{low}} < \theta \leq \theta_{\text{med}} \\
+50 + 50 \cdot \frac{\theta - \theta_{\text{med}}}{\theta_{\text{ext}} - \theta_{\text{med}}}
+  & \text{if } \theta_{\text{med}} < \theta < \theta_{\text{ext}} \\
+100 & \text{if } \theta \geq \theta_{\text{ext}}
 \end{cases}$$
 
-where $a, b, c, d$ are the trapezoid parameters defining the shape.
+where $\theta_{\text{low}}$, $\theta_{\text{med}}$, $\theta_{\text{ext}}$
+are the low_max, medium_max, and extreme_min thresholds per feature
+(see Section 13).
 
-**Linguistic variables per feature**: `neutral`, `moderate`, `high`, `extreme`. Asymmetry and inclination omit `extreme` (3-level: neutral, moderate, high).
-
-#### Stage 2: Rule Evaluation
-
-Each rule $R_k$ is a conjunction of antecedents:
-
-$$R_k: \text{IF } x_1 \text{ IS } A_{k1} \text{ AND } x_2 \text{ IS } A_{k2} \text{ THEN } y \text{ IS } B_k$$
-
-The firing strength of rule $R_k$ is:
-
-$$\alpha_k = \min(\mu_{A_{k1}}(x_1), \mu_{A_{k2}}(x_2), \ldots)$$
-
-The minimum operator ($\land$) implements the fuzzy AND, which is the most commonly used t-norm in Mamdani systems [47].
-
-#### Stage 3: Aggregation
-
-The output of each rule is a fuzzy set clipped at the firing strength $\alpha_k$. These sets are aggregated by maximum:
+The overall severity is the weighted mean of primary feature severities,
+using the weights defined in Section 12.
 
 $$\mu_{\text{agg}}(y) = \max_k \min(\alpha_k, \mu_{B_k}(y))$$
 
@@ -745,7 +800,47 @@ The output centroids for the five risk levels are:
 
 **Citation**: The Mamdani FIS for ergonomic assessment follows the framework established in [18, Section 3] and [19, Section 3.3], adapted with trapezoidal MFs (instead of Gaussian in [18]) to maintain full interpretability without requiring training data.
 
-### 11.3 Pre-Processing for Paired Features
+### 11.3 Biomechanical Severity Caps
+
+The fuzzy inference output is post-processed by three explicit **biomechanical severity caps** that encode ergonomic domain knowledge not fully captured by the rule base:
+
+#### Cap 1: Neck-Only HIGH Prevention
+
+If ONLY the neck is severe (neck severity ≥ 55) while trunk AND upper arms are not (severity < 55):
+
+$$\text{severity} = \min(\text{severity}_{\text{FIS}},\ 55)$$
+
+The risk class is capped to MEDIUM (severity < 65).
+
+**Rationale**: Neck flexion is often overestimated in 2D monocular video (see Section 10.2). More importantly, isolated neck deviation without torso or arm involvement rarely represents the same whole-body risk as combined deviations. In RULA, neck alone contributes at most score 6 to the Grand Score, but the wrist and arm tables modify it [3].
+
+#### Cap 2: Secondary-Only HIGH Prevention
+
+If only secondary features are severe (max secondary severity ≥ 55) while all primaries are below moderate (max primary severity < 35):
+
+$$\text{severity} = \min(\text{severity}_{\text{FIS}},\ 50)$$
+
+The risk class is capped to MEDIUM.
+
+**Rationale**: Secondary features (forearm deviation, knee bend, asymmetry, inclination) are biomechanically less load-bearing than primary features. A worker with perfect torso and arm posture but awkward knees should not receive HIGH risk without primary involvement.
+
+#### Cap 3: Safe Trunk and Arms — HIGH Forbidden
+
+If $\theta_{\text{trunk}} < 30^\circ$ AND $\theta_{\text{upper\_arm}} < 45^\circ$:
+
+$$\text{severity} = \min(\text{severity}_{\text{FIS}},\ 64.9)$$
+
+HIGH risk (severity ≥ 65) is biomechanically implausible in this posture range.
+
+**Rationale**: With trunk flexion below 30° (RULA score 1--2) and upper arm elevation below 45° (RULA score 1--2), the worker's core postural load is moderate at most. HIGH risk requires either severe trunk or arm deviation, or combined moderate deviations. This cap prevents false HIGH from noise or neck overestimation.
+
+#### Cap Application Order
+
+The caps are applied **independently** — each can trigger, and the minimum resulting severity is used. This means multiple caps can apply simultaneously (e.g., both neck-only and safe trunk/arms active), and the most restrictive cap prevails.
+
+All applied caps are recorded in the `applied_caps` field of the output, enabling full traceability.
+
+### 11.4 Pre-Processing for Paired Features
 
 For paired features (upper arm, forearm, knee), the **worst side** is used as input to the FIS:
 
@@ -906,42 +1001,42 @@ The rule base consists of 24 rules organised hierarchically. All rules are of Ma
 
 #### Critical Level (→ very_high)
 
-Rules that independently trigger VERY HIGH risk — a single body region at extreme deviation:
+Rules that independently trigger VERY HIGH risk — trunk or upper arm at extreme deviation:
 
 ```
 IF trunk IS extreme    → very_high
-IF neck IS extreme     → very_high
 IF upper_arm IS extreme → very_high
 ```
 
-**Rationale**: In RULA, a trunk score of 4 (maximum, corresponding to >60° flexion) or an upper arm score of 4 (>90° elevation) produces a Grand Score of at least 5--6 (Action Level 3) even with all other segments at minimum [3, Scoring Tables]. A single extreme region is sufficient to indicate critical risk.
+**Neck is excluded**: Neck alone NEVER triggers very_high (or high). This is because:
+1. **2D projection error**: Monocular neck angle conflates cervical flexion with head translation, producing large angles from non-risky postures in side views.
+2. **RULA context**: RULA neck score requires the full assessment context including torso position, which the fuzzy rule base captures via combined rules (neck + trunk, neck + arm).
 
-#### High Level (→ very_high, from combinations)
+**Rationale**: A single extreme trunk (RULA score 4) or upper arm (RULA score 4) drives the Grand Score to 5+ (Action Level 3) even with all other segments at minimum [3, Scoring Tables].
 
-```
-IF trunk IS high AND upper_arm IS moderate      → very_high
-IF neck IS high AND upper_arm IS moderate        → very_high
-IF trunk IS high AND neck IS moderate            → very_high
-IF neck IS high AND trunk IS moderate            → very_high
-IF trunk IS moderate AND upper_arm IS high       → very_high
-IF neck IS moderate AND upper_arm IS high        → very_high
-IF upper_arm IS high AND forearm IS high          → very_high
-```
-
-**Rationale**: These rules capture **biomechanical interaction** — situations where no single feature is extreme, but combined moderate-high deviations in multiple primary regions create severe whole-body loading. For example, a worker with trunk at 50° (high) and arms at 50° elevation (moderate) carries load through both the lumbar spine and shoulders, producing a risk higher than either in isolation. This follows RULA's additive logic in Group A + Group B scoring [3, Table C].
-
-#### Medium-High Level (→ high)
+#### Very High Level (→ very_high, from combinations)
 
 ```
-IF trunk IS high                → high
-IF neck IS high                 → high
-IF upper_arm IS high            → high
-IF trunk IS moderate AND neck IS moderate    → high
+IF trunk IS high AND upper_arm IS moderate    → very_high
+IF trunk IS moderate AND upper_arm IS high    → very_high
+IF upper_arm IS high AND forearm IS high       → very_high
+```
+
+**Rationale**: These rules capture **biomechanical interaction** — situations where no single feature is extreme, but combined moderate-high deviations in multiple primary regions create severe whole-body loading (e.g., trunk at 50° + arms at 50°). The neck is excluded from very_high level; neck involvement requires trunk or arm co-involvement for high-level outputs. For example, a worker with trunk at 50° (high) and arms at 50° elevation (moderate) carries load through both the lumbar spine and shoulders, producing a risk higher than either in isolation. This follows RULA's additive logic in Group A + Group B scoring [3, Table C].
+
+#### High Level (→ high)
+
+```
+IF trunk IS high                           → high
+IF upper_arm IS high                       → high
+IF trunk IS moderate AND neck IS moderate  → high
+IF trunk IS moderate AND neck IS extreme   → high
 IF trunk IS moderate AND upper_arm IS moderate → high
 IF neck IS moderate AND upper_arm IS moderate → high
+IF neck IS extreme AND upper_arm IS moderate → high
 ```
 
-**Rationale**: A single high primary region produces HIGH risk (in RULA, a score of 3 on any segment typically drives Grand Score ≥ 5). Combined moderate deviations also produce HIGH due to ergonomic interaction.
+**Rationale**: Single high trunk or upper arm independently triggers HIGH (RULA score 3 on these segments typically drives Grand Score ≥ 5). Neck requires trunk or upper arm co-involvement — see Section 14.1 for the biomechanical rationale behind this design decision.
 
 #### Medium Level (→ medium)
 
@@ -1007,33 +1102,43 @@ Frame-by-frame pose estimation exhibits **jitter** — small, random fluctuation
 
 These fluctuations translate into frame-to-frame oscillations of 5--15° in computed joint angles [49]. Without temporal smoothing, the risk class can flip between LOW and MEDIUM on consecutive frames even when the worker's actual posture is stable.
 
-### 15.2 Exponential Moving Average (EMA)
+### 15.2 Asymmetric Exponential Moving Average
 
-The system applies an Exponential Moving Average to the continuous severity score:
+Standard EMA applies the same smoothing factor $\alpha$ regardless of whether the signal is rising or falling. This creates a problem for ergonomic screening: when a worker returns to a neutral posture after an intense exertion, the smoothed score decays symmetrically, maintaining an artificially high risk class for several frames.
 
-$$S_t = \alpha \cdot s_t + (1 - \alpha) \cdot S_{t-1}$$
+ErgoVision uses **asymmetric EMA** with separate coefficients for rising and falling:
+
+$$S_t = \begin{cases}
+\alpha_{\text{rise}} \cdot s_t + (1 - \alpha_{\text{rise}}) \cdot S_{t-1} & s_t \geq S_{t-1} \\
+\alpha_{\text{decay}} \cdot s_t + (1 - \alpha_{\text{decay}}) \cdot S_{t-1} & s_t < S_{t-1}
+\end{cases}$$
 
 where:
-- $S_t$ = smoothed severity at frame $t$
-- $s_t$ = raw (instantaneous) severity at frame $t$
-- $\alpha \in [0, 1]$ = smoothing factor
+- $\alpha_{\text{rise}} = 0.25$ — slower reaction when risk is increasing (conservative entry to HIGH)
+- $\alpha_{\text{decay}} = 0.50$ — faster reaction when risk is decreasing (quick exit from HIGH)
 
-The parameter $\alpha$ controls the smoothing strength:
+#### Asymmetric Behaviour
 
-| $\alpha$ | Effective window (frames) | Characteristic |
-|---|---|---|
-| 1.0 | 1 | No smoothing |
-| 0.5 | ~4 | Moderate smoothing |
-| 0.35 | ~6 | Default — balances responsiveness and stability |
-| 0.2 | ~10 | Heavy smoothing |
+| Scenario | $\alpha$ used | Effective window | Rationale |
+|---|---|---|---|
+| Risk rising ($s_t \geq S_{t-1}$) | 0.25 | ~7 frames | Conservative: require sustained evidence before accepting HIGH |
+| Risk falling ($s_t < S_{t-1}$) | 0.50 | ~3 frames | Responsive: quickly reduce risk when posture normalises |
 
-The **effective window size** $n_{\text{eff}}$ of an EMA is approximately:
+**Example**: After 5 HIGH frames (severity 71), the worker returns to neutral (severity 25):
+
+| Frame | Raw | Symmetric EMA ($\alpha=0.35$) | Asymmetric EMA ($\alpha_{\text{decay}}=0.50$) |
+|---|---|---|---|
+| t+1 | 25 | 55.0 (HIGH) | **48.1 (MEDIUM)** |
+| t+2 | 25 | 44.5 (MEDIUM) | **36.5 (MEDIUM)** |
+| t+3 | 25 | 37.7 (MEDIUM) | **30.5 (LOW)** |
+
+The asymmetric EMA exits HIGH one frame earlier and reaches LOW one frame earlier than the symmetric version.
+
+The **effective window size** for each mode:
 
 $$n_{\text{eff}} \approx \frac{2 - \alpha}{\alpha}$$
 
-At $\alpha = 0.35$, $n_{\text{eff}} \approx 4.7$ frames. At 1 FPS sampling, this corresponds to ~5 seconds of temporal context.
-
-**Default**: $\alpha = 0.35$, chosen to provide moderate smoothing without excessive lag. This follows the recommendation in [50] for human motion analysis, where values of 0.3--0.4 balance smoothness and responsiveness.
+At $\alpha_{\text{rise}} = 0.25$: $n_{\text{eff}} \approx 7$ frames. At $\alpha_{\text{decay}} = 0.50$: $n_{\text{eff}} \approx 3$ frames.
 
 ### 15.3 Implementation
 
@@ -1049,13 +1154,14 @@ The smoothed score is used for risk classification; the raw score is preserved a
 
 ### 15.4 Smoothing-Induced Lag
 
-EMA smoothing introduces a systematic lag:
+Asymmetric EMA introduces direction-dependent lag:
 
-$$\text{lag}_{\text{max}} = \frac{1 - \alpha}{\alpha} \quad \text{(frames)}$$
+$$\text{lag}_{\text{rise}} = \frac{1 - \alpha_{\text{rise}}}{\alpha_{\text{rise}}} \approx 3.0\ \text{frames}$$
+$$\text{lag}_{\text{decay}} = \frac{1 - \alpha_{\text{decay}}}{\alpha_{\text{decay}}} \approx 1.0\ \text{frames}$$
 
-At $\alpha = 0.35$, the lag is approximately 1.9 frames. A genuine posture change (e.g., worker bending from 0° to 60° trunk) takes ~4 frames to reach 90% of the new equilibrium. At 1 FPS sampling, this is a 4-second delay — acceptable for offline screening, less so for real-time feedback.
+A genuine posture change from neutral to risk (rise) takes ~5 frames to reach 90% of equilibrium at 1 FPS. A return to neutral (decay) takes ~2 frames.
 
-**Trade-off accepted**: Smoothing lag is tolerated because the system targets historical screening rather than real-time alerting. Low-latency applications would require higher $\alpha$ values.
+**Trade-off accepted**: The asymmetry deliberately biases the system toward **under-estimation** during rapid transitions on the way up and **over-estimation** during transitions down. This is safer: it means the system is slower to flag new risk (avoiding false alarms from transient movements) but quick to clear risk when the posture normalises.
 
 ---
 
@@ -1086,27 +1192,27 @@ The RULA assessment manual [3, Section 2.3] notes that "posture scores are inten
 
 ---
 
-## 17. Final Risk Classification
+## 17. Final Risk Classification (RULA-Inspired Action Levels)
 
-### 17.1 Risk Classes
+### 17.1 Risk Classes — Action Level Mapping
 
-| Class | Severity Range | Interpretation | Suggested Action |
-|---|---|---|---|
-| **Low Risk** | [0, 35) | Neutral postural alignment. No significant deviation from anatomical neutral across observed features. | None required. |
-| **Medium Risk** | [35, 65) | Moderate postural deviations observed. Further investigation recommended to determine if these postures are sustained or frequent. | Monitor; consider workstation review if frequent. |
-| **High Risk** | [65, 100] | Sustained severe postural load. Multiple features at high deviation or a single feature at extreme deviation. | Intervention recommended. Ergonomic review and workstation redesign should be considered. |
+The three-level output maps approximately to RULA Action Levels, following the precedent established by Li et al. (2020) [32] and Massiris Fernández et al. (2020) [31] in mapping vision-based scores to simplified RULA categories.
 
-### 17.2 Class Boundaries: Derivation
+| Class | Action Level | Severity Range | Interpretation | Suggested Action |
+|---|---|---|---|---|
+| **AL1 (Low Risk)** | AL1 | [0, 35) | Neutral postural alignment. No significant deviation from anatomical neutral across observed features. | None required. |
+| **AL2 (Medium Risk)** | AL2 | [35, 65) | Moderate postural deviations observed. Further investigation recommended to determine if these postures are sustained or frequent. | Monitor; consider workstation review if frequent. |
+| **AL3+ (High Risk)** | AL3--4 | [65, 100] | Sustained severe postural load. Multiple features at high deviation or a single feature at extreme deviation — corresponds to RULA Action Levels 3 and 4 combined. | Intervention recommended. Ergonomic review and workstation redesign should be considered. |
 
-The class boundaries (35 and 65) are derived from the fuzzy output centroids:
+### 17.2 Class Boundaries
 
-- The `low` centroid is 25.0 (midpoint of 10-20-30-40 trapezoid). Adding one standard deviation (~10 points) gives 35, which marks the transition from predominantly LOW to predominantly MEDIUM.
-- The `very_high` centroid is ~90.0. Subtracting one standard deviation gives ~65, which marks the transition from HIGH to VERY_HIGH.
+The boundaries at severity 35 and 65 are project-specific calibrations. They should be interpreted as approximate RULA-inspired Action Level equivalents, not certified clinical thresholds:
 
-These boundaries are **project-specific** and are not equivalent to RULA Action Level thresholds. Users should NOT map directly:
-
-> ❌ ErgoVision "Medium Risk" ≠ RULA Action Level 2
-> ✓ ErgoVision "Medium Risk" ~ "Moderate postural deviation warranting further investigation"
+| ErgoVision Output | RULA Action Level | RULA Grand Score Range |
+|---|---|---|
+| AL1 (Low Risk) | AL1 | 1--2 |
+| AL2 (Medium Risk) | AL2 | 3--4 |
+| AL3+ (High Risk) | AL3--4 | 5--7 |
 
 ### 17.3 Confidence Integration
 
@@ -1524,6 +1630,18 @@ This would resolve occlusion and 2D projection issues, but at significantly incr
 
 [51] Slyszko, R. A., et al. (2018). The effect of camera perspective on the accuracy of joint angle measurement in 2D video analysis. *Journal of Biomechanics*, 68, 37--43.
 
+### Vision-Based Ergonomic Assessment — Reviews and Seminal Papers
+
+[28] Deshpande, U. U., et al. (2025). A review of machine learning techniques for ergonomic risk assessment based on human pose estimation. *Discover Artificial Intelligence*, 5, 287. https://doi.org/10.1007/s44163-025-00566-5
+
+[29] Iyer, H., & Jeong, H. (2025). A PRISMA Review of Human Pose Estimation Models for Ergonomic Risk Assessment and Workplace Safety. *Proceedings of the Human Factors and Ergonomics Society Annual Meeting*. https://doi.org/10.1177/10711813251358776
+
+[30] Iyer, H., & Jeong, H. (2025). A scoping review on emerging technologies and automation of musculoskeletal ergonomic assessments. *Ergonomics*. https://doi.org/10.1080/00140139.2025.2547286
+
+[31] Massiris Fernández, M., Fernández, J. Á., Bajo, J. M., & Delrieux, C. A. (2020). Ergonomic risk assessment based on computer vision and machine learning. *Computers & Industrial Engineering*, 149, 106816. https://doi.org/10.1016/j.cie.2020.106816
+
+[32] Li, L., Martin, T., & Xu, X. (2020). A novel vision-based real-time method for evaluating postural risk factors associated with musculoskeletal disorders. *Applied Ergonomics*, 87, 103138. https://doi.org/10.1016/j.apergo.2020.103138
+
 ---
 
 ## Appendix A: Formula Summary
@@ -1533,7 +1651,9 @@ This would resolve occlusion and 2D projection issues, but at significantly incr
 | 10.1 | $\theta(p_1,p_2,p_3) = \arccos\left(\frac{(p_1-p_2)\cdot(p_3-p_2)}{\|p_1-p_2\|\|p_3-p_2\|}\right)$ | Three-point angle (radians) |
 | 10.1 | $\phi(p_u,p_l) = \arccos\left(\frac{(p_u-p_l)\cdot(0,-1)}{\|p_u-p_l\|}\right)$ | Angle from vertical (degrees) |
 | 10.2 | $\theta_{\text{trunk}} = \phi(S_m, H_m)$ | Trunk angle |
-| 10.2 | $\theta_{\text{neck}} = \phi(N, S_m)$ | Neck angle |
+| 10.2 | $\theta_{\text{neck}} = \phi(N, S_m)$ | Neck angle (absolute, raw) |
+| 10.2 | $\theta_{\text{neck-rel}} = \max(0, \theta_{\text{neck-abs}} - \theta_{\text{trunk}})$ | Neck angle (relative to trunk, used when trunk > 15°) |
+| 10.2 | $R_{\text{neck}} = \max(0, 1 - \theta_{\text{trunk}} / 45^\circ)$ | Neck reliability |
 | 10.2 | $\theta_{\text{UA}} = \phi(S, E)$ | Upper arm angle |
 | 10.2 | $\theta_{\text{FA}} = \theta(S,E,W),\ \text{dev}=|\theta_{\text{FA}}-90\degree|$ | Forearm deviation |
 | 10.2 | $\text{bend} = 180\degree - \theta(H,K,A)$ | Knee bend |
@@ -1542,7 +1662,10 @@ This would resolve occlusion and 2D projection issues, but at significantly incr
 | 9.1 | $C = \sqrt{\sigma(n_{\text{valid}}-8) \cdot \min(\bar{c}/0.5, 1)}$ | Pose confidence |
 | 11.2 | $\mu(x) = \text{trapezoid}(x; a,b,c,d)$ | Fuzzy membership |
 | 11.2 | $y^* = \frac{\sum \alpha_k \cdot c_k}{\sum \alpha_k}$ | Defuzzification (weighted avg.) |
-| 15.2 | $S_t = \alpha \cdot s_t + (1-\alpha) \cdot S_{t-1}$ | EMA temporal smoothing |
+| 15.2 | $S_t = \alpha_{\text{rise/decay}} \cdot s_t + (1-\alpha_{\text{rise/decay}}) \cdot S_{t-1}$ | Asymmetric EMA |
+| 11.3 | $\text{cap}_1: \text{sev} \leq 55$ if neck only high | Neck biomechanical cap |
+| 11.3 | $\text{cap}_2: \text{sev} \leq 50$ if secondary only high | Secondary biomechanical cap |
+| 11.3 | $\text{cap}_3: \text{sev} \leq 64.9$ if trunk < 30° AND arms < 45° | Safe posture cap |
 | App | $n_{\text{eff}} \approx (2-\alpha)/\alpha$ | Effective EMA window |
 | 16.2 | $p_t = p_{t-1} + 1$ if same class else 1 | Persistence counter |
 
@@ -1557,6 +1680,23 @@ This would resolve occlusion and 2D projection issues, but at significantly incr
 | Knee bend | (0,0,10,20) | (15,30,45,60) | (45,60,90,120) | (90,120,180,180) |
 | Asymmetry | (0,0,5,10) | (8,15,25,35) | (25,35,50,∞) | — |
 | Inclination | (0,0,5,10) | (8,15,25,35) | (25,35,50,∞) | — |
+
+## Appendix C: EMA Parameters
+
+| Parameter | Value | Purpose |
+|---|---|---|
+| $\alpha_{\text{rise}}$ | 0.25 | Conservative entry to HIGH (slower rise) |
+| $\alpha_{\text{decay}}$ | 0.50 | Responsive exit from HIGH (faster drop) |
+| $\text{severity}_{\text{low\_max}}$ | 35 | Threshold: LOW → MEDIUM |
+| $\text{severity}_{\text{medium\_max}}$ | 65 | Threshold: MEDIUM → HIGH |
+
+## Appendix D: Biomechanical Caps Reference
+
+| Cap | Condition | Effect | Rationale |
+|---|---|---|---|
+| Neck-only HIGH | neck severity ≥ 55 AND trunk + upper arm severity < 55 | max severity = 55, max risk = MEDIUM | 2D neck overestimation |
+| Secondary-only HIGH | max secondary sev ≥ 55 AND max primary sev < 35 | max severity = 50, max risk = MEDIUM | Secondaries cannot drive HIGH alone |
+| Safe trunk/arms | trunk < 30° AND upper arms < 45° | HIGH forbidden (max 64.9) | Biomechanically implausible |
 
 ## Appendix C: Warning and Disclaimer
 
