@@ -58,7 +58,7 @@ def _op(variable: str, value: Optional[float], threshold: float,
 
 
 def _single_op_rule(rule_id: str, name: str, description: str,
-                    condition: str, consequence_label: str,
+                    condition: str, consequence_label: str, category: str,
                     variable: str, value: Optional[float],
                     threshold: float, comparison: str) -> dict:
     """Build a trace entry for a single-operand rule."""
@@ -69,6 +69,7 @@ def _single_op_rule(rule_id: str, name: str, description: str,
         "name": name,
         "description": description,
         "condition": condition,
+        "category": category,
         "operands": [operand],
         "passed": triggered,
         "triggered": triggered,
@@ -141,7 +142,7 @@ def build_person_rule_trace(score_result: dict,
     rules.append(_single_op_rule(
         "high_trunk_60", "HIGH: trunk >= 60°",
         "Severe trunk flexion.",
-        "trunk_angle >= 60°", "HIGH",
+        "trunk_angle >= 60°", "HIGH", "high",
         "trunk_angle >= 60", trunk_val, 60, '>=',
     ))
 
@@ -227,21 +228,21 @@ def build_person_rule_trace(score_result: dict,
     rules.append(_single_op_rule(
         "medium_trunk_30", "MEDIUM: trunk >= 30°",
         "Moderate trunk flexion.",
-        "trunk_angle >= 30°", "MEDIUM",
+        "trunk_angle >= 30°", "MEDIUM", "medium",
         "trunk_angle >= 30", trunk_val, 30, '>=',
     ))
 
     rules.append(_single_op_rule(
         "medium_arm_45", "MEDIUM: upper_arm >= 45°",
         "Moderate arm elevation.",
-        "upper_arm_max >= 45°", "MEDIUM",
+        "upper_arm_max >= 45°", "MEDIUM", "medium",
         "upper_arm_max >= 45", ua_max, 45, '>=',
     ))
 
     rules.append(_single_op_rule(
         "medium_neck_45", "MEDIUM: neck >= 45° (capped)",
         "Moderate neck flexion — automatically capped to MEDIUM.",
-        "neck_angle >= 45°", "MEDIUM",
+        "neck_angle >= 45°", "MEDIUM", "medium",
         "neck_angle >= 45", neck_val, 45, '>=',
     ))
 
@@ -282,19 +283,6 @@ def build_person_rule_trace(score_result: dict,
                        'medium_neck_45', 'medium_moderate_primaries')
     )
     low_fallback = not neutral_gate_passed and not high_triggered and not med_triggered
-
-    # After neck cap: re-check if the HIGH that was capped was the only HIGH
-    if neck_capped:
-        # If the only reason for HIGH was neck-based, it got capped;
-        # check if any remaining HIGH rule still holds after the cap
-        high_after_cap = any(
-            r['triggered'] for r in rules
-            if r['id'] in ('high_trunk_60', 'high_trunk_45_arm_60',
-                           'high_arm_90_trunk_30', 'high_severe_primaries')
-        )
-        # But these were already evaluated on raw angles, not affected by cap
-        # The cap only affects the outcome, not the rule firing
-        pass
 
     rules.append({
         "id": "low_fallback",
