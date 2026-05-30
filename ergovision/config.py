@@ -259,6 +259,7 @@ class ExperimentConfig:
         self.save_failure_cases = True
         self.save_csv = True
         self.save_plots = True
+        self.save_rule_trace = True   # JSON trace of every rule evaluated
 
     # -- output sub-directories (computed each call) ------------------------
 
@@ -307,6 +308,10 @@ class ExperimentConfig:
     @property
     def csv_video_summary_path(self):
         return self.output_csv_dir / 'video_summary.csv'
+
+    @property
+    def rule_trace_path(self):
+        return self.output_path / 'rule_trace.json'
 
     def __repr__(self):
         return (

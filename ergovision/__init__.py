@@ -11,5 +11,6 @@ from .pipeline import ErgoPipeline
 from .detection import HumanDetector
 from .dataset import find_images, select_subset, inspect_dataset, DatasetInfo
 from .config import ExperimentConfig
+from .rule_trace import build_person_rule_trace, save_rule_trace
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"

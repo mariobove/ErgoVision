@@ -41,6 +41,7 @@ from .config import (
     RISK_LEVEL_SHORT,
     ALL_ANGLE_FEATURES,
 )
+from .rule_trace import build_person_rule_trace, save_rule_trace
 
 
 # ===================================================================
@@ -380,6 +381,7 @@ class ErgoPipeline:
         if verbose:
             print(f"\n[4/6] Computing ergonomic risk scores...")
         all_rows = []
+        rule_traces = []   # for interpretability trace JSON
         processed_frames = 0
         frames_with_people = 0
         total_person_detections = 0
@@ -423,6 +425,10 @@ class ErgoPipeline:
                 if fp_reason is not None:
                     score_result = self.scorer.score(kps)
                     ps = score_result['partial_scores']
+                    if cfg.save_rule_trace:
+                        rule_traces.append(build_person_rule_trace(
+                            score_result, ps, frame_id, person_idx,
+                        ))
                     row = {
                         'dataset_name': dataset_name,
                         'video_id': video_id,
@@ -457,6 +463,11 @@ class ErgoPipeline:
                 # --- Valid posture: score it ---
                 score_result = self.scorer.score(kps)
                 ps = score_result['partial_scores']
+
+                if cfg.save_rule_trace:
+                    rule_traces.append(build_person_rule_trace(
+                        score_result, ps, frame_id, person_idx,
+                    ))
 
                 n_available = sum(
                     1 for v in ps.values() if v.get('score') is not None
@@ -561,6 +572,10 @@ class ErgoPipeline:
             result.video_summary_rows = video_summary_rows
             self._save_video_summary_csv(video_summary_rows,
                                          cfg.csv_video_summary_path, verbose)
+
+        # ---- Rule trace JSON (interpretability) ----
+        if cfg.save_rule_trace and rule_traces:
+            save_rule_trace(rule_traces, cfg.rule_trace_path)
 
         # ---- Step 6: Visual outputs ----
         if verbose:
