@@ -8,6 +8,7 @@ decision can be fully audited frame-by-frame.
 Saved during pipeline execution as ``rule_trace.json`` in the output dir.
 """
 
+import json
 from pathlib import Path
 from typing import Any, Optional
 
