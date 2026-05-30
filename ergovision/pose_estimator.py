@@ -12,7 +12,7 @@ No training or fine-tuning.
 
 import numpy as np
 from ultralytics import YOLO
-from .config import POSE_MODEL_NAME, CROP_POSE_MODEL, KEYPOINT_INDICES as KPT
+from .config import POSE_MODEL_NAME, CROP_POSE_MODEL
 
 
 # ===================================================================

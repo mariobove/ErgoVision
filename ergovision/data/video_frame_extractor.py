@@ -70,15 +70,21 @@ class VideoFrameExtractor:
     blur_threshold : float
         Laplacian variance below which a frame is considered blurry and
         skipped.  Set to ``0`` to disable blur filtering.
+    use_filename_as_id : bool
+        If True, use the full video filename (stem + extension) as the
+        subdirectory name, preventing collisions when videos share the same
+        stem but differ in extension or path (default: True).
     """
 
     def __init__(self, output_dir=None, sampling_rate=1.0,
-                 max_frames_per_video=100, blur_threshold=None):
+                 max_frames_per_video=100, blur_threshold=None,
+                 use_filename_as_id=True):
         self.output_dir = Path(output_dir or _DEFAULT_FRAMES_DIR)
         self.sampling_rate = sampling_rate
         self.max_frames_per_video = max_frames_per_video
         self.blur_threshold = blur_threshold if blur_threshold is not None \
             else _DEFAULT_BLUR_THRESHOLD
+        self.use_filename_as_id = use_filename_as_id
 
     def extract(self, video_path, video_name=None):
         """
@@ -108,7 +114,10 @@ class VideoFrameExtractor:
             Summary statistics and list of saved frame paths.
         """
         video_path = Path(video_path)
-        vname = video_name or video_path.stem
+        # Use full filename (stem + suffix) as the unique subdirectory name
+        # to avoid collisions when videos share the same stem but differ in
+        # extension or are located in different directories.
+        vname = video_name or (video_path.name if self.use_filename_as_id else video_path.stem)
         result = ExtractionResult(vname)
 
         cap = cv2.VideoCapture(str(video_path))

@@ -35,7 +35,8 @@ Human Detection  →  Pose Estimation  →  Rule-Based Risk Scoring  →  Tempor
 20. [Experimental Protocol](#20-experimental-protocol)
 21. [Limitations](#21-limitations)
 22. [Future Work](#22-future-work)
-23. [References](#23-references)
+23. [Generating Paper Figures and Experimental Tables](#23-generating-paper-figures-and-experimental-tables)
+24. [References](#24-references)
 
 ---
 
@@ -898,7 +899,7 @@ The FIS captures all three properties through its rule structure.
 
 ---
 
-## 13. Membership Functions and Threshold Calibration
+## 13. Segment Score Thresholds
 
 ### 13.1 Calibration Principles
 
@@ -993,50 +994,51 @@ The membership functions for shoulder asymmetry and body inclination are **proje
 
 ---
 
-## 14. Fuzzy Rule Base
+## 14. Final Risk Decision Rules
 
-### 14.1 Rule Design
+### 14.1 Overview
 
-The rule base consists of 24 rules organised hierarchically. All rules are of Mamdani type with AND-connected antecedents.
+The final risk class (AL1 / AL2 / AL3+) is determined by explicit rules operating on raw joint angles and segment scores. These replace the previous fuzzy inference system.
 
-#### Critical Level (→ very_high)
+**Decision order**: Neutral Gate → HIGH rules → MEDIUM rules → LOW (fallback).
 
-Rules that independently trigger VERY HIGH risk — trunk or upper arm at extreme deviation:
-
-```
-IF trunk IS extreme    → very_high
-IF upper_arm IS extreme → very_high
-```
-
-**Neck is excluded**: Neck alone NEVER triggers very_high (or high). This is because:
-1. **2D projection error**: Monocular neck angle conflates cervical flexion with head translation, producing large angles from non-risky postures in side views.
-2. **RULA context**: RULA neck score requires the full assessment context including torso position, which the fuzzy rule base captures via combined rules (neck + trunk, neck + arm).
-
-**Rationale**: A single extreme trunk (RULA score 4) or upper arm (RULA score 4) drives the Grand Score to 5+ (Action Level 3) even with all other segments at minimum [3, Scoring Tables].
-
-#### Very High Level (→ very_high, from combinations)
+#### Neutral Posture Gate (checked first)
 
 ```
-IF trunk IS high AND upper_arm IS moderate    → very_high
-IF trunk IS moderate AND upper_arm IS high    → very_high
-IF upper_arm IS high AND forearm IS high       → very_high
+IF trunk_angle < 20°
+AND upper_arm_max < 45°
+AND neck_angle < 30°
+AND body_inclination < 20%
+THEN → AL1 (Low Risk)
 ```
 
-**Rationale**: These rules capture **biomechanical interaction** — situations where no single feature is extreme, but combined moderate-high deviations in multiple primary regions create severe whole-body loading (e.g., trunk at 50° + arms at 50°). The neck is excluded from very_high level; neck involvement requires trunk or arm co-involvement for high-level outputs. For example, a worker with trunk at 50° (high) and arms at 50° elevation (moderate) carries load through both the lumbar spine and shoulders, producing a risk higher than either in isolation. This follows RULA's additive logic in Group A + Group B scoring [3, Table C].
+The gate exits early for clearly safe postures, bypassing all risk rules. It does not apply when manual context (force/load/static posture) is provided.
 
-#### High Level (→ high)
+#### HIGH Rules (AL3+)
+
+HIGH is assigned when **any** of the following conditions is true:
 
 ```
-IF trunk IS high                           → high
-IF upper_arm IS high                       → high
-IF trunk IS moderate AND neck IS moderate  → high
-IF trunk IS moderate AND neck IS extreme   → high
-IF trunk IS moderate AND upper_arm IS moderate → high
-IF neck IS moderate AND upper_arm IS moderate → high
-IF neck IS extreme AND upper_arm IS moderate → high
+1. trunk_angle >= 60°
+2. trunk_angle >= 45° AND upper_arm_max >= 60°
+3. upper_arm_max >= 90° AND trunk_angle >= 30°
+4. two or more severe primary deviations (score >= 3)
 ```
 
-**Rationale**: Single high trunk or upper arm independently triggers HIGH (RULA score 3 on these segments typically drives Grand Score ≥ 5). Neck requires trunk or upper arm co-involvement — see Section 14.1 for the biomechanical rationale behind this design decision.
+**Exception**: If neck is the **only** severe feature (trunk and arm scores < 3), the maximum risk is AL2 (MEDIUM). Neck alone can never produce HIGH. For example, a worker with trunk at 50° (high) and arms at 50° elevation (moderate) carries load through both the lumbar spine and shoulders, producing a risk higher than either in isolation. This follows RULA's additive logic in Group A + Group B scoring [3, Table C].
+
+#### MEDIUM Rules (AL2)
+
+MEDIUM is assigned when **any** of the following is true (and no HIGH rule triggered):
+
+```
+1. trunk_angle >= 30°
+2. upper_arm_max >= 45°
+3. neck_angle >= 45° (capped — see below)
+4. two or more moderate primary deviations (score >= 2)
+```
+
+**Neck cap**: When neck_angle >= 45° but trunk and arm scores are < 3, the risk is capped to AL2.
 
 #### Medium Level (→ medium)
 
@@ -1514,7 +1516,72 @@ This would resolve occlusion and 2D projection issues, but at significantly incr
 
 ---
 
-## 23. References
+## 23. Generating Paper Figures and Experimental Tables
+
+A dedicated script (`scripts/generate_paper_figures.py`) produces paper-ready
+figures and tables from the pipeline CSV outputs, without re-running the
+pipeline.
+
+### Required Input
+
+- `outputs/<dataset>/csv/frame_person_results.csv` (main per-frame results)
+- `outputs/<dataset>/csv/video_summary.csv` (optional, per-video summary)
+
+### Usage
+
+```bash
+# Using dataset name (looks in outputs/<dataset>/csv/)
+python scripts/generate_paper_figures.py --dataset <dataset_name>
+
+# Using explicit paths
+python scripts/generate_paper_figures.py \
+    --input outputs/<dataset>/csv/frame_person_results.csv \
+    --output outputs/<dataset>/paper_figures
+```
+
+### Generated Outputs
+
+All outputs are saved to `outputs/<dataset>/paper_figures/`.
+
+#### Tables (CSV + Markdown)
+
+| File | Description |
+|---|---|
+| `paper_table_dataset_summary.csv` / `.md` | Experiment summary: videos, frames, risk distribution, keypoint confidence |
+| `paper_examples_index.csv` / `.md` | 3 representative frames per risk level (LOW, MEDIUM, HIGH) |
+| `paper_failure_cases_index.csv` / `.md` | Discarded / uncertain / low-confidence frames |
+| `manual_validation_template.csv` | 100 balanced samples for ergonomist annotation (human_label column empty) |
+| `experimental_results_summary.md` | Paper-ready markdown report with figures, tables, and observations |
+
+#### Figures (300 dpi PNG)
+
+| File | Description |
+|---|---|
+| `fig_risk_distribution.png` | Bar chart of LOW / MEDIUM / HIGH counts |
+| `fig_risk_distribution_by_video.png` | Stacked bar chart per video |
+| `fig_risk_distribution_by_workstation.png` | Stacked bar chart per workstation (WS10/20/30 extracted from video_id) |
+| `fig_angle_distributions.png` | Boxplot of all joint angles |
+| `fig_pose_quality_confidence.png` | Histogram of mean keypoint confidence |
+| `fig_valid_keypoints_distribution.png` | Bar chart of valid keypoints per frame |
+| `fig_pose_acceptance_summary.png` | Bar chart of accepted vs discarded poses |
+| `fig_temporal_risk_evolution_representative.png` | Timeline for the video with most risk transitions |
+| `timelines/fig_timeline_<video_id>.png` | Per-video risk evolution timelines |
+
+### Error Handling
+
+The script gracefully handles missing columns (skips the affected figure
+and logs a warning), empty risk levels (no HIGH, no discarded), and
+missing image paths (tables are still created with empty path fields).
+
+### Dependencies
+
+- `pandas` (for CSV reading and data manipulation)
+- `matplotlib` (for all plotting)
+- No seaborn or other heavy dependencies required.
+
+---
+
+## 24. References
 
 ### Primary References (Ergonomic Methods)
 

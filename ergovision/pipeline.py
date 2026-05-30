@@ -13,9 +13,9 @@ Two execution modes:
 
 import csv
 import json
-import shutil
 import time
 from pathlib import Path
+from typing import Optional
 
 import cv2
 import numpy as np
@@ -84,7 +84,8 @@ class ErgoPipeline:
         Runtime configuration.  A default one is created if omitted.
     """
 
-    def __init__(self, model_name=None, config=None):
+    def __init__(self, model_name: Optional[str] = None,
+                 config: Optional[ExperimentConfig] = None) -> None:
         cfg = config or ExperimentConfig()
         self.config = cfg
 
@@ -821,7 +822,11 @@ class ErgoPipeline:
     def _save_annotated_video(self, cfg, dataset_info, verbose):
         video_frames = {}
         for af in cfg.output_annotated_frames_dir.glob('*'):
-            parts = af.stem.split('_', 1)
+            # Annotated filename format: {video_id}_{frame_id}.jpg
+            # frame_id always starts with 'frame_', so rsplit on the last
+            # underscore reliably extracts the full video_id even when the
+            # video name itself contains underscores.
+            parts = af.stem.rsplit('_', 1)
             if len(parts) >= 2:
                 vid = parts[0]
                 video_frames.setdefault(vid, []).append(af)

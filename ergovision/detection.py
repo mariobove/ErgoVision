@@ -6,6 +6,7 @@ running pose estimation on each crop.  Significantly reduces false
 positives compared with the one-stage YOLOv8-pose approach.
 """
 
+from typing import Optional
 import numpy as np
 from ultralytics import YOLO
 from .config import HUMAN_DETECTOR_MODEL, COCO_PERSON_CLASS_ID

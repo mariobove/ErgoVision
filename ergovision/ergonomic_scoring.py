@@ -16,10 +16,10 @@ References
 - Deshpande et al. (2025). ML for HPE-based ERA (review). *Discover AI*, 5, 287.
 """
 
+from typing import Any, Optional
 import numpy as np
 from .config import (
     RISK_CLASSES,
-    RISK_LEVEL_SHORT,
     KEYPOINT_INDICES as KPT,
 )
 
@@ -27,7 +27,7 @@ from .config import (
 # Vector geometry helpers
 # ===================================================================
 
-def angle_between(v1, v2):
+def angle_between(v1: np.ndarray, v2: np.ndarray) -> float:
     """Angle (degrees) between two vectors in Euclidean space."""
     n1 = np.linalg.norm(v1)
     n2 = np.linalg.norm(v2)
@@ -38,7 +38,7 @@ def angle_between(v1, v2):
     return float(np.degrees(np.arccos(cos_a)))
 
 
-def calculate_angle(p1, p2, p3):
+def calculate_angle(p1: np.ndarray, p2: np.ndarray, p3: np.ndarray) -> float:
     """Angle (degrees) at p2 from vectors p2->p1 and p2->p3."""
     v1 = np.array(p1) - np.array(p2)
     v2 = np.array(p3) - np.array(p2)
@@ -49,8 +49,13 @@ def calculate_angle(p1, p2, p3):
 # Pose confidence
 # ===================================================================
 
-def compute_pose_confidence(keypoints, min_confidence=0.3):
-    """Continuous confidence score in [0, 1]."""
+def compute_pose_confidence(keypoints: np.ndarray, min_confidence: float = 0.3) -> tuple:
+    """Continuous confidence score in [0, 1].
+
+    Returns
+    -------
+    (confidence, n_valid, mean_conf) — confidence in [0, 1].
+    """
     valid_confs = []
     n_valid = 0
     for i in range(min(17, keypoints.shape[0])):
@@ -329,8 +334,16 @@ class ErgonomicScorer:
 
     # -- public API ------------------------------------------------------
 
-    def score(self, keypoints, manual_context=None):
+    def score(self,
+              keypoints: np.ndarray,
+              manual_context: Optional[dict] = None) -> dict[str, Any]:
         """Compute approximate RULA Action Level for a single frame.
+
+        Parameters
+        ----------
+        keypoints : np.ndarray, shape (17, 2) or (17, 3)
+        manual_context : dict or None
+            Optional user-provided context (load_force, muscle_use, etc.).
 
         Returns
         -------
@@ -647,10 +660,23 @@ class ErgonomicScorer:
 # ===================================================================
 
 class TemporalSmoothedScorer:
-    """Wraps :class:`ErgonomicScorer` with asymmetric EMA."""
+    """Wraps :class:`ErgonomicScorer` with asymmetric EMA.
 
-    def __init__(self, alpha=0.25, decay_alpha=0.50,
-                 severity_low_max=35, severity_medium_max=65):
+    Parameters
+    ----------
+    alpha : float
+        EMA factor for rising (default 0.25).
+    decay_alpha : float
+        EMA factor for falling (default 0.50, faster decay).
+    severity_low_max : float
+        Smoothed severity threshold for LOW→MEDIUM (default 35).
+    severity_medium_max : float
+        Smoothed severity threshold for MEDIUM→HIGH (default 65).
+    """
+
+    def __init__(self, alpha: float = 0.25, decay_alpha: float = 0.50,
+                 severity_low_max: float = 35,
+                 severity_medium_max: float = 65) -> None:
         self.scorer = ErgonomicScorer()
         self.alpha = alpha
         self.decay_alpha = decay_alpha
@@ -658,7 +684,10 @@ class TemporalSmoothedScorer:
         self.severity_medium_max = severity_medium_max
         self._state = {}
 
-    def score(self, keypoints, tracking_key=None, manual_context=None):
+    def score(self,
+              keypoints: np.ndarray,
+              tracking_key: Optional[str] = None,
+              manual_context: Optional[dict] = None) -> dict[str, Any]:
         raw = self.scorer.score(keypoints, manual_context=manual_context)
         raw_sev = raw['continuous_severity']
 
@@ -710,8 +739,11 @@ class TemporalSmoothedScorer:
             self._state.pop(tracking_key, None)
 
 
-def temporal_smooth_severity(results_rows, alpha=0.25, decay_alpha=0.50,
-                              severity_low_max=35, severity_medium_max=65):
+def temporal_smooth_severity(results_rows: list[dict],
+                              alpha: float = 0.25,
+                              decay_alpha: float = 0.50,
+                              severity_low_max: float = 35,
+                              severity_medium_max: float = 65) -> list[dict]:
     """Post-process rows with asymmetric EMA (post-hoc)."""
     from collections import defaultdict
     groups = defaultdict(list)
